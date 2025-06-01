@@ -34,6 +34,12 @@ app.get("/items", (req, res) => {
   });
 });
 
+app.get("/", (_, res) => {
+   res.json({
+    ok: 1
+  });
+})
+
 app.post("/sort-dnd", (req, res) => {
   const id = req.body.id as string;
   const toIndex = req.body.toIndex as string;
