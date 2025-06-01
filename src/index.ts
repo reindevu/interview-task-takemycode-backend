@@ -49,4 +49,4 @@ app.post("/sort-dnd", (req, res) => {
   res.json({ update });
 });
 
-app.listen(3000, () => console.log("Сервер запущен на порту 3001"));
+app.listen(3000, () => console.log("Сервер запущен на порту 3000"));
