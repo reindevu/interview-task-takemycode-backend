@@ -66,29 +66,37 @@ var items = Array.from({ length: 1e3 }, (_, i) => ({
   name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
   order: i + 1
 }));
-app.get("/items", (req, res) => {
-  const { start = 0, limit = 20, search = "", sortOrder = "asc" } = req.query;
-  let filteredItems = items.filter(
-    (item) => item.name.includes(search)
-  );
-  filteredItems.sort(
-    (a, b) => sortOrder === "asc" ? a.order - b.order : b.order - a.order
-  );
-  res.json({
-    items: filteredItems.slice(Number(start), Number(start) + Number(limit)),
-    totalCount: filteredItems.length
-  });
-});
 app.get("/", (_, res) => {
   res.json({
     ok: 1
   });
 });
-app.post("/sort-dnd", (req, res) => {
-  const id = req.body.id;
-  const toIndex = req.body.toIndex;
-  const update = moveItem(items, Number(id), Number(toIndex));
-  items = update;
-  res.json({ update });
+app.get("/list-default", (req, res) => {
+  try {
+    const { start = 0, limit = 20, search = "", sortOrder = "asc" } = req.query;
+    let filteredItems = items.filter(
+      (item) => item.name.includes(search)
+    );
+    filteredItems.sort(
+      (a, b) => sortOrder === "asc" ? a.order - b.order : b.order - a.order
+    );
+    res.json({
+      records: filteredItems.slice(Number(start), Number(start) + Number(limit)),
+      totalRecords: filteredItems.length
+    });
+  } catch (e) {
+    console.log(e);
+  }
 });
-app.listen(3e3, () => console.log("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u043D\u0430 \u043F\u043E\u0440\u0442\u0443 3001"));
+app.post("/operation-sort", (req, res) => {
+  try {
+    const id = req.body.id;
+    const toIndex = req.body.toIndex;
+    const update = moveItem(items, Number(id), Number(toIndex));
+    items = update;
+    res.status(200).json({});
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.listen(3e3, () => console.log("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u043D\u0430 \u043F\u043E\u0440\u0442\u0443 3000"));
