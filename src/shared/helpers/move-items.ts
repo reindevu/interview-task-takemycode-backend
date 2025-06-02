@@ -1,37 +1,51 @@
 import { Item } from "../types";
-import { fractionalOrder } from "./fractional-order";
 
-export const moveItem = (items: Item[], itemId: number, newIndex: number) => {
-    let updatedItems: Item[] = [...items];
+export const moveItem = (items: Item[], movingId: number, targetId: number) => {
+  const updatedItems = [...items];
 
-    // Находим элемент
-    const item = updatedItems.find(i => i.id === itemId);
-    if (!item) {
-        throw new Error("Элемент с таким id не найден");
+  const movingItem = updatedItems.find((i) => i.id === movingId);
+  if (!movingItem) {
+    throw new Error(`Элемент с id ${movingId} не найден`);
+  }
+
+  const targetItem = updatedItems.find((i) => i.id === targetId);
+
+  if (!targetItem) {
+    throw new Error(`targetId=${targetId} не найден`);
+  }
+
+  const itemsWithoutMoving = updatedItems.filter((i) => i.id !== movingId);
+  let newOrder;
+
+  if (movingItem.order > targetItem.order) {
+    const sortedItems = itemsWithoutMoving.sort((a, b) => a.order - b.order);
+    const targetIndex = sortedItems.findIndex((i) => i.id === targetId);
+
+    if (targetIndex === 0) {
+      newOrder = targetItem.order / 2;
+    } else {
+      const prevOrder = sortedItems[targetIndex - 1].order;
+      newOrder = (prevOrder + targetItem.order) / 2;
     }
+  } else if (movingItem.order < targetItem.order) {
+    const sortedItems = itemsWithoutMoving.sort((a, b) => a.order - b.order);
+    const targetIndex = sortedItems.findIndex((i) => i.id === targetId);
 
-    // Удаляем элемент из массива
-    updatedItems = updatedItems.filter(i => i.id !== itemId);
-
-    // Проверяем, что newIndex находится в допустимых пределах
-    if (newIndex < 0) {
-        newIndex = 0;
-    } else if (newIndex > updatedItems.length) {
-        newIndex = updatedItems.length;
+    if (targetIndex === sortedItems.length - 1) {
+      newOrder = targetItem.order + 1;
+    } else {
+      const nextOrder = sortedItems[targetIndex + 1].order;
+      newOrder = (targetItem.order + nextOrder) / 2;
     }
+  } else {
+    newOrder = targetItem.order;
+  }
 
-    // Определяем соседние порядковые номера
-    const prevOrder = newIndex > 0 ? updatedItems[newIndex - 1]?.order : null;
-    const nextOrder = newIndex < updatedItems.length ? updatedItems[newIndex]?.order : null;
+  movingItem.order = newOrder;
 
-    // Вычисляем новый order
-    item.order = fractionalOrder(prevOrder, nextOrder);
+  const result = [...itemsWithoutMoving, movingItem].sort(
+    (a, b) => a.order - b.order
+  );
 
-    // Вставляем элемент на новую позицию
-    updatedItems.splice(newIndex, 0, item);
-
-    // Сортируем
-    updatedItems.sort((a, b) => a.order - b.order);
-
-    return updatedItems;
-}
+  return result;
+};
