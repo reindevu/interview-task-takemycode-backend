@@ -27,33 +27,45 @@ var import_cors = __toESM(require("cors"));
 var import_express = __toESM(require("express"));
 var import_multer = __toESM(require("multer"));
 
-// src/shared/helpers/fractional-order.ts
-var fractionalOrder = (prev, next) => {
-  if (prev === null && next === null) return 1;
-  if (prev === null) return next / 2;
-  if (next === null) return prev + 1;
-  return (prev + next) / 2;
-};
-
 // src/shared/helpers/move-items.ts
-var moveItem = (items2, itemId, newIndex) => {
-  let updatedItems = [...items2];
-  const item = updatedItems.find((i) => i.id === itemId);
-  if (!item) {
-    throw new Error("\u042D\u043B\u0435\u043C\u0435\u043D\u0442 \u0441 \u0442\u0430\u043A\u0438\u043C id \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D");
+var moveItem = (items2, movingId, targetId) => {
+  const updatedItems = [...items2];
+  const movingItem = updatedItems.find((i) => i.id === movingId);
+  if (!movingItem) {
+    throw new Error(`\u042D\u043B\u0435\u043C\u0435\u043D\u0442 \u0441 id ${movingId} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D`);
   }
-  updatedItems = updatedItems.filter((i) => i.id !== itemId);
-  if (newIndex < 0) {
-    newIndex = 0;
-  } else if (newIndex > updatedItems.length) {
-    newIndex = updatedItems.length;
+  const targetItem = updatedItems.find((i) => i.id === targetId);
+  if (!targetItem) {
+    throw new Error(`targetId=${targetId} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D`);
   }
-  const prevOrder = newIndex > 0 ? updatedItems[newIndex - 1]?.order : null;
-  const nextOrder = newIndex < updatedItems.length ? updatedItems[newIndex]?.order : null;
-  item.order = fractionalOrder(prevOrder, nextOrder);
-  updatedItems.splice(newIndex, 0, item);
-  updatedItems.sort((a, b) => a.order - b.order);
-  return updatedItems;
+  const itemsWithoutMoving = updatedItems.filter((i) => i.id !== movingId);
+  let newOrder;
+  if (movingItem.order > targetItem.order) {
+    const sortedItems = itemsWithoutMoving.sort((a, b) => a.order - b.order);
+    const targetIndex = sortedItems.findIndex((i) => i.id === targetId);
+    if (targetIndex === 0) {
+      newOrder = targetItem.order / 2;
+    } else {
+      const prevOrder = sortedItems[targetIndex - 1].order;
+      newOrder = (prevOrder + targetItem.order) / 2;
+    }
+  } else if (movingItem.order < targetItem.order) {
+    const sortedItems = itemsWithoutMoving.sort((a, b) => a.order - b.order);
+    const targetIndex = sortedItems.findIndex((i) => i.id === targetId);
+    if (targetIndex === sortedItems.length - 1) {
+      newOrder = targetItem.order + 1;
+    } else {
+      const nextOrder = sortedItems[targetIndex + 1].order;
+      newOrder = (targetItem.order + nextOrder) / 2;
+    }
+  } else {
+    newOrder = targetItem.order;
+  }
+  movingItem.order = newOrder;
+  const result = [...itemsWithoutMoving, movingItem].sort(
+    (a, b) => a.order - b.order
+  );
+  return result;
 };
 
 // src/index.ts
@@ -61,40 +73,80 @@ var app = (0, import_express.default)();
 app.use((0, import_cors.default)());
 app.use(import_express.default.json({ limit: "1000mb" }));
 app.use((0, import_multer.default)().any());
-var items = Array.from({ length: 1e3 }, (_, i) => ({
-  id: i,
+var items = Array.from({ length: 1e6 }, (_, i) => ({
+  id: i + 1,
   name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
   order: i + 1
 }));
+var state = {
+  list: items,
+  sortOrder: "asc",
+  checkedIds: /* @__PURE__ */ new Set([])
+};
 app.get("/", (_, res) => {
   res.json({
     ok: 1
   });
 });
-app.get("/list-default", (req, res) => {
+app.get("/getList", (req, res) => {
   try {
-    const { start = 0, limit = 20, search = "", sortOrder = "asc" } = req.query;
-    let filteredItems = items.filter(
+    const { start = 0, limit = 20, search = "" } = req.query;
+    let filteredItems = state.list.filter(
       (item) => item.name.includes(search)
     );
     filteredItems.sort(
-      (a, b) => sortOrder === "asc" ? a.order - b.order : b.order - a.order
+      (a, b) => state.sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
     res.json({
-      records: filteredItems.slice(Number(start), Number(start) + Number(limit)),
+      sortOrder: state.sortOrder,
+      records: filteredItems.slice(
+        Number(start),
+        Number(start) + Number(limit)
+      ),
       totalRecords: filteredItems.length
     });
   } catch (e) {
     console.log(e);
   }
 });
-app.post("/operation-sort", (req, res) => {
+app.get("/getListChecked", (_, res) => {
   try {
-    const id = req.body.id;
-    const toIndex = req.body.toIndex;
-    const update = moveItem(items, Number(id), Number(toIndex));
-    items = update;
+    res.json({ checkedIds: Array.from(state.checkedIds) });
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.get("/getSort", (_, res) => {
+  try {
+    res.json({ sortOrder: state.sortOrder });
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.post("/updateSortRow", (req, res) => {
+  try {
+    const { id, targetOrder } = req.body;
+    const update = moveItem(state.list, Number(id), Number(targetOrder));
+    state.list = update;
+    res.status(200).json({ update });
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.post("/updateSortOrder", (req, res) => {
+  try {
+    const { sortOrder } = req.body;
+    state.sortOrder = sortOrder;
     res.status(200).json({});
+  } catch (e) {
+    console.log(e);
+  }
+});
+app.post("/checkRow", (req, res) => {
+  try {
+    const { id } = req.body;
+    state.checkedIds.has(id) ? state.checkedIds.delete(id) : state.checkedIds.add(id);
+    res.status(200).json({ checkedIds: Array.from(state.checkedIds) });
   } catch (e) {
     console.log(e);
   }

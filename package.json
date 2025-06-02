@@ -5,7 +5,7 @@
   "scripts": {
     "tsc": "npx tsc && rm -rf dist",
     "build": "tsup src/index.ts --out-dir . --format cjs",
-    "start": "node index.js",
+    "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
