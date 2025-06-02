@@ -81,7 +81,7 @@ var items = Array.from({ length: 1e6 }, (_, i) => ({
 var state = {
   list: items,
   sortOrder: "asc",
-  checkedIds: /* @__PURE__ */ new Set([])
+  checkedIds: []
 };
 app.get("/", (_, res) => {
   res.json({
@@ -111,7 +111,7 @@ app.get("/getList", (req, res) => {
 });
 app.get("/getListChecked", (_, res) => {
   try {
-    res.json({ checkedIds: Array.from(state.checkedIds) });
+    res.json({ checkedIds: state.checkedIds });
   } catch (e) {
     console.log(e);
   }
@@ -145,8 +145,12 @@ app.post("/updateSortOrder", (req, res) => {
 app.post("/checkRow", (req, res) => {
   try {
     const { id } = req.body;
-    state.checkedIds.has(id) ? state.checkedIds.delete(id) : state.checkedIds.add(id);
-    res.status(200).json({ checkedIds: Array.from(state.checkedIds) });
+    if (state.checkedIds.includes(id)) {
+      state.checkedIds = state.checkedIds.filter((item) => item !== id);
+    } else {
+      state.checkedIds.push(id);
+    }
+    res.status(200).json({ checkedIds: state.checkedIds });
   } catch (e) {
     console.log(e);
   }
