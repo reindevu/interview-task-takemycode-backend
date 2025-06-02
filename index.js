@@ -28,8 +28,8 @@ var import_express = __toESM(require("express"));
 var import_multer = __toESM(require("multer"));
 
 // src/shared/helpers/move-items.ts
-var moveItem = (items2, movingId, targetId) => {
-  const updatedItems = [...items2];
+var moveItem = (items, movingId, targetId) => {
+  const updatedItems = [...items];
   const movingItem = updatedItems.find((i) => i.id === movingId);
   if (!movingItem) {
     throw new Error(`\u042D\u043B\u0435\u043C\u0435\u043D\u0442 \u0441 id ${movingId} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D`);
@@ -69,90 +69,120 @@ var moveItem = (items2, movingId, targetId) => {
 };
 
 // src/index.ts
+var import_zod = require("zod");
+var PORT = 3e3;
+var PaginationSchema = import_zod.z.object({
+  start: import_zod.z.coerce.number().min(0).default(0),
+  limit: import_zod.z.coerce.number().min(1).max(1e3).default(20),
+  search: import_zod.z.string().default("")
+});
+var UpdateSortRowSchema = import_zod.z.object({
+  id: import_zod.z.number().positive(),
+  targetOrder: import_zod.z.number().positive()
+});
+var UpdateSortOrderSchema = import_zod.z.object({
+  sortOrder: import_zod.z.enum(["asc", "desc"])
+});
+var CheckRowSchema = import_zod.z.object({
+  id: import_zod.z.number().positive()
+});
 var app = (0, import_express.default)();
 app.use((0, import_cors.default)());
 app.use(import_express.default.json({ limit: "1000mb" }));
 app.use((0, import_multer.default)().any());
-var items = Array.from({ length: 1e6 }, (_, i) => ({
-  id: i + 1,
-  name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
-  order: i + 1
-}));
 var state = {
-  list: items,
+  list: Array.from({ length: 1e6 }, (_, i) => ({
+    id: i + 1,
+    name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
+    order: i + 1
+  })),
   sortOrder: "asc",
   checkedIds: []
 };
-app.get("/", (_, res) => {
-  res.json({
-    ok: 1
-  });
-});
-app.get("/getList", (req, res) => {
-  try {
-    const { start = 0, limit = 20, search = "" } = req.query;
+var asyncHandler = (fn) => (req, res, next) => {
+  return Promise.resolve(fn(req, res, next)).catch(next);
+};
+app.get(
+  "/",
+  asyncHandler((_, res) => {
+    res.json({ ok: 1 });
+  })
+);
+app.get(
+  "/getList",
+  asyncHandler((req, res) => {
+    const validation = PaginationSchema.safeParse(req.query);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    const { start, limit, search } = validation.data;
     let filteredItems = state.list.filter(
       (item) => item.name.includes(search)
     );
     filteredItems.sort(
       (a, b) => state.sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
+    const paginatedItems = filteredItems.slice(start, start + limit);
     res.json({
       sortOrder: state.sortOrder,
-      records: filteredItems.slice(
-        Number(start),
-        Number(start) + Number(limit)
-      ),
+      records: paginatedItems,
       totalRecords: filteredItems.length
     });
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.get("/getListChecked", (_, res) => {
-  try {
+  })
+);
+app.get(
+  "/getListChecked",
+  asyncHandler((_, res) => {
     res.json({ checkedIds: state.checkedIds });
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.get("/getSort", (_, res) => {
-  try {
+  })
+);
+app.get(
+  "/getSort",
+  asyncHandler((_, res) => {
     res.json({ sortOrder: state.sortOrder });
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.post("/updateSortRow", (req, res) => {
-  try {
-    const { id, targetOrder } = req.body;
-    const update = moveItem(state.list, Number(id), Number(targetOrder));
-    state.list = update;
-    res.status(200).json({});
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.post("/updateSortOrder", (req, res) => {
-  try {
-    const { sortOrder } = req.body;
+  })
+);
+app.post(
+  "/updateSortRow",
+  asyncHandler(async (req, res) => {
+    const validation = UpdateSortRowSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    const parsedData = validation.data;
+    const { id, targetOrder } = parsedData;
+    state.list = moveItem(state.list, Number(id), Number(targetOrder));
+    res.json({});
+  })
+);
+app.post(
+  "/updateSortOrder",
+  asyncHandler((req, res) => {
+    const validation = UpdateSortOrderSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    const parsedData = validation.data;
+    const { sortOrder } = parsedData;
     state.sortOrder = sortOrder;
     res.status(200).json({});
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.post("/checkRow", (req, res) => {
-  try {
-    const { id } = req.body;
+  })
+);
+app.post(
+  "/checkRow",
+  asyncHandler((req, res) => {
+    const validation = CheckRowSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    const parsedData = validation.data;
+    const { id } = parsedData;
     if (state.checkedIds.includes(id)) {
       state.checkedIds = state.checkedIds.filter((item) => item !== id);
     } else {
       state.checkedIds.push(id);
     }
     res.status(200).json({ checkedIds: state.checkedIds });
-  } catch (e) {
-    console.log(e);
-  }
-});
-app.listen(3e3, () => console.log("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u043D\u0430 \u043F\u043E\u0440\u0442\u0443 3000"));
+  })
+);
+app.listen(PORT, () => console.log("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u043D\u0430 \u043F\u043E\u0440\u0442\u0443 3000"));

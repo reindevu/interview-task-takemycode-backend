@@ -1,8 +1,30 @@
 import cors from "cors";
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import multer from "multer";
-import { Item } from "./shared/types";
+import { AppState } from "./shared/types";
 import { moveItem } from "./shared/helpers";
+import { z } from "zod";
+
+const PORT = 3000;
+
+const PaginationSchema = z.object({
+  start: z.coerce.number().min(0).default(0),
+  limit: z.coerce.number().min(1).max(1000).default(20),
+  search: z.string().default(""),
+});
+
+const UpdateSortRowSchema = z.object({
+  id: z.number().positive(),
+  targetOrder: z.number().positive(),
+});
+
+const UpdateSortOrderSchema = z.object({
+  sortOrder: z.enum(["asc", "desc"]),
+});
+
+const CheckRowSchema = z.object({
+  id: z.number().positive(),
+});
 
 const app = express();
 
@@ -10,31 +32,38 @@ app.use(cors());
 app.use(express.json({ limit: "1000mb" }));
 app.use(multer().any());
 
-let items: Item[] = Array.from({ length: 1000000 }, (_, i) => ({
-  id: i+1,
-  name: `Элемент ${i + 1}`,
-  order: i + 1,
-}));
-
-const state: {
-  list: Item[];
-  sortOrder: string;
-  checkedIds: number[]
-} = {
-  list: items,
+const state: AppState = {
+  list: Array.from({ length: 1000000 }, (_, i) => ({
+    id: i + 1,
+    name: `Элемент ${i + 1}`,
+    order: i + 1,
+  })),
   sortOrder: "asc",
-  checkedIds: []
+  checkedIds: [],
 };
 
-app.get("/", (_, res) => {
-  res.json({
-    ok: 1,
-  });
-});
+const asyncHandler =
+  (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+    return Promise.resolve(fn(req, res, next)).catch(next);
+  };
 
-app.get("/getList", (req, res) => {
-  try {
-    const { start = 0, limit = 20, search = ""} = req.query;
+app.get(
+  "/",
+  asyncHandler((_: Request, res: Response) => {
+    res.json({ ok: 1 });
+  })
+);
+
+app.get(
+  "/getList",
+  asyncHandler((req: Request, res: Response) => {
+    const validation = PaginationSchema.safeParse(req.query);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+
+    const { start, limit, search } = validation.data;
 
     let filteredItems = state.list.filter((item) =>
       item.name.includes(search as string)
@@ -44,75 +73,86 @@ app.get("/getList", (req, res) => {
       state.sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
 
+    const paginatedItems = filteredItems.slice(start, start + limit);
+
     res.json({
       sortOrder: state.sortOrder,
-      records: filteredItems.slice(
-        Number(start),
-        Number(start) + Number(limit)
-      ),
+      records: paginatedItems,
       totalRecords: filteredItems.length,
     });
-  } catch (e) {
-    console.log(e);
-  }
-});
+  })
+);
 
-app.get("/getListChecked", (_, res) => {
-  try {
+app.get(
+  "/getListChecked",
+  asyncHandler((_: Request, res: Response) => {
     res.json({ checkedIds: state.checkedIds });
-  } catch (e) {
-    console.log(e);
-  }
-});
+  })
+);
 
-app.get("/getSort", (_, res) => {
-  try {
+app.get(
+  "/getSort",
+  asyncHandler((_: Request, res: Response) => {
     res.json({ sortOrder: state.sortOrder });
-  } catch (e) {
-    console.log(e);
-  }
-})
+  })
+);
 
-app.post("/updateSortRow", (req, res) => {
-  try {
-    const {id, targetOrder} = req.body;
+app.post(
+  "/updateSortRow",
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = UpdateSortRowSchema.safeParse(req.body);
 
-    const update = moveItem(state.list, Number(id), Number(targetOrder));
-    state.list = update;
-    
-    res.status(200).json({});
-  } catch (e) {
-    console.log(e);
-  }
-});
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
 
-app.post("/updateSortOrder", (req, res) => {
-  try {
-    const {sortOrder} = req.body;
+    const parsedData = validation.data;
+    const { id, targetOrder } = parsedData;
+
+    state.list = moveItem(state.list, Number(id), Number(targetOrder));
+
+    res.json({});
+  })
+);
+
+app.post(
+  "/updateSortOrder",
+  asyncHandler((req: Request, res: Response) => {
+    const validation = UpdateSortOrderSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+
+    const parsedData = validation.data;
+    const { sortOrder } = parsedData;
 
     state.sortOrder = sortOrder;
-  
+
     res.status(200).json({});
-  } catch (e) {
-    console.log(e);
-  }
-});
+  })
+);
 
-app.post("/checkRow", (req, res) => {
-  try {
-    const { id } = req.body as { id: number };
+app.post(
+  "/checkRow",
+  asyncHandler((req: Request, res: Response) => {
+    const validation = CheckRowSchema.safeParse(req.body);
 
-    if(state.checkedIds.includes(id)) {
-      state.checkedIds = state.checkedIds.filter(item => item !== id);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+
+    const parsedData = validation.data;
+    const { id } = parsedData;
+
+    if (state.checkedIds.includes(id)) {
+      state.checkedIds = state.checkedIds.filter((item) => item !== id);
     } else {
-      state.checkedIds.push(id)
+      state.checkedIds.push(id);
     }
 
     res.status(200).json({ checkedIds: state.checkedIds });
-  } catch (e) {
-    console.log(e);
-  }
-});
+  })
+);
 
-
-app.listen(3000, () => console.log("Сервер запущен на порту 3000"));
+app.listen(PORT, () => console.log("Сервер запущен на порту 3000"));
