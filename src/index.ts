@@ -19,11 +19,11 @@ let items: Item[] = Array.from({ length: 1000000 }, (_, i) => ({
 const state: {
   list: Item[];
   sortOrder: string;
-  checkedIds: Set<number>
+  checkedIds: number[]
 } = {
   list: items,
   sortOrder: "asc",
-  checkedIds: new Set<number>([]),
+  checkedIds: []
 };
 
 app.get("/", (_, res) => {
@@ -59,7 +59,7 @@ app.get("/getList", (req, res) => {
 
 app.get("/getListChecked", (_, res) => {
   try {
-    res.json({ checkedIds: Array.from(state.checkedIds) });
+    res.json({ checkedIds: state.checkedIds });
   } catch (e) {
     console.log(e);
   }
@@ -102,9 +102,13 @@ app.post("/checkRow", (req, res) => {
   try {
     const { id } = req.body as { id: number };
 
-    state.checkedIds.has(id) ? state.checkedIds.delete(id) : state.checkedIds.add(id);
+    if(state.checkedIds.includes(id)) {
+      state.checkedIds = state.checkedIds.filter(item => item !== id);
+    } else {
+      state.checkedIds.push(id)
+    }
 
-    res.status(200).json({ checkedIds: Array.from(state.checkedIds) });
+    res.status(200).json({ checkedIds: state.checkedIds });
   } catch (e) {
     console.log(e);
   }
