@@ -80,7 +80,7 @@ app.post("/updateSortRow", (req, res) => {
     const update = moveItem(state.list, Number(id), Number(targetOrder));
     state.list = update;
     
-    res.status(200).json({update});
+    res.status(200).json({});
   } catch (e) {
     console.log(e);
   }
