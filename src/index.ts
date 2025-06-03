@@ -71,9 +71,10 @@ app.get(
     );
 
     const paginatedItems = filteredItems.slice(start, start + limit);
+    
+    console.log(state.sortOrder, state.checkedIds);
 
     res.json({
-      sortOrder: state.sortOrder,
       records: paginatedItems,
       totalRecords: filteredItems.length,
     });
