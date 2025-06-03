@@ -72,6 +72,7 @@ var moveItem = (items, movingId, targetId) => {
 var import_zod = require("zod");
 var PORT = 3e3;
 var PaginationSchema = import_zod.z.object({
+  sortOrder: import_zod.z.enum(["asc", "desc"]),
   start: import_zod.z.coerce.number().min(0).default(0),
   limit: import_zod.z.coerce.number().min(1).max(1e3).default(20),
   search: import_zod.z.string().default("")
@@ -79,9 +80,6 @@ var PaginationSchema = import_zod.z.object({
 var UpdateSortRowSchema = import_zod.z.object({
   id: import_zod.z.number().positive(),
   targetOrder: import_zod.z.number().positive()
-});
-var UpdateSortOrderSchema = import_zod.z.object({
-  sortOrder: import_zod.z.enum(["asc", "desc"])
 });
 var CheckRowSchema = import_zod.z.object({
   id: import_zod.z.number().positive()
@@ -112,16 +110,17 @@ app.get(
     if (!validation.success) {
       return res.status(400).json({ error: validation.error.errors });
     }
-    const { start, limit, search } = validation.data;
+    const { start, limit, search, sortOrder } = validation.data;
     let filteredItems = state.list.filter(
       (item) => item.name.includes(search)
     );
     filteredItems.sort(
-      (a, b) => state.sortOrder === "asc" ? a.order - b.order : b.order - a.order
+      (a, b) => sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
     const paginatedItems = filteredItems.slice(start, start + limit);
-    console.log(state.sortOrder, state.checkedIds);
+    state.sortOrder = sortOrder;
     res.json({
+      sortOrder: state.sortOrder,
       records: paginatedItems,
       totalRecords: filteredItems.length
     });
@@ -150,19 +149,6 @@ app.post(
     const { id, targetOrder } = parsedData;
     state.list = moveItem(state.list, Number(id), Number(targetOrder));
     res.json({});
-  })
-);
-app.post(
-  "/updateSortOrder",
-  asyncHandler((req, res) => {
-    const validation = UpdateSortOrderSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ error: validation.error.errors });
-    }
-    const parsedData = validation.data;
-    const { sortOrder } = parsedData;
-    state.sortOrder = sortOrder;
-    res.status(200).json({});
   })
 );
 app.post(

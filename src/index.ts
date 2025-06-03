@@ -8,6 +8,7 @@ import { z } from "zod";
 const PORT = 3000;
 
 const PaginationSchema = z.object({
+  sortOrder: z.enum(["asc", "desc"]),
   start: z.coerce.number().min(0).default(0),
   limit: z.coerce.number().min(1).max(1000).default(20),
   search: z.string().default(""),
@@ -16,10 +17,6 @@ const PaginationSchema = z.object({
 const UpdateSortRowSchema = z.object({
   id: z.number().positive(),
   targetOrder: z.number().positive(),
-});
-
-const UpdateSortOrderSchema = z.object({
-  sortOrder: z.enum(["asc", "desc"]),
 });
 
 const CheckRowSchema = z.object({
@@ -60,21 +57,22 @@ app.get(
       return res.status(400).json({ error: validation.error.errors });
     }
 
-    const { start, limit, search } = validation.data;
+    const { start, limit, search, sortOrder } = validation.data;
 
     let filteredItems = state.list.filter((item) =>
       item.name.includes(search as string)
     );
 
     filteredItems.sort((a, b) =>
-      state.sortOrder === "asc" ? a.order - b.order : b.order - a.order
+      sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
 
     const paginatedItems = filteredItems.slice(start, start + limit);
     
-    console.log(state.sortOrder, state.checkedIds);
+    state.sortOrder = sortOrder;
 
     res.json({
+      sortOrder: state.sortOrder,
       records: paginatedItems,
       totalRecords: filteredItems.length,
     });
@@ -95,6 +93,7 @@ app.get(
   })
 );
 
+
 app.post(
   "/updateSortRow",
   asyncHandler(async (req: Request, res: Response) => {
@@ -110,24 +109,6 @@ app.post(
     state.list = moveItem(state.list, Number(id), Number(targetOrder));
 
     res.json({});
-  })
-);
-
-app.post(
-  "/updateSortOrder",
-  asyncHandler((req: Request, res: Response) => {
-    const validation = UpdateSortOrderSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({ error: validation.error.errors });
-    }
-
-    const parsedData = validation.data;
-    const { sortOrder } = parsedData;
-
-    state.sortOrder = sortOrder;
-
-    res.status(200).json({});
   })
 );
 
