@@ -32,27 +32,24 @@ app.use(cors());
 app.use(express.json({ limit: "1000mb" }));
 app.use(multer().any());
 
-const state: AppState = {
-  list: Array.from({ length: 1000000 }, (_, i) => ({
+const initializeState = (): AppState => {
+  return {
+    list: Array.from({ length: 1000000 }, (_, i) => ({
     id: i + 1,
     name: `Элемент ${i + 1}`,
     order: i + 1,
   })),
   sortOrder: "asc",
   checkedIds: [],
-};
+  }
+}
+
+const state: AppState = initializeState();
 
 const asyncHandler =
   (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
     return Promise.resolve(fn(req, res, next)).catch(next);
   };
-
-app.get(
-  "/",
-  asyncHandler((_: Request, res: Response) => {
-    res.json({ ok: 1 });
-  })
-);
 
 app.get(
   "/getList",
