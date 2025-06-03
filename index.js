@@ -111,6 +111,7 @@ app.get(
       return res.status(400).json({ error: validation.error.errors });
     }
     const { start, limit, search, sortOrder } = validation.data;
+    state.sortOrder = sortOrder;
     let filteredItems = state.list.filter(
       (item) => item.name.includes(search)
     );
@@ -118,7 +119,6 @@ app.get(
       (a, b) => sortOrder === "asc" ? a.order - b.order : b.order - a.order
     );
     const paginatedItems = filteredItems.slice(start, start + limit);
-    state.sortOrder = sortOrder;
     res.json({
       sortOrder: state.sortOrder,
       records: paginatedItems,

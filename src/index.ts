@@ -59,6 +59,8 @@ app.get(
 
     const { start, limit, search, sortOrder } = validation.data;
 
+    state.sortOrder = sortOrder;
+
     let filteredItems = state.list.filter((item) =>
       item.name.includes(search as string)
     );
@@ -69,8 +71,6 @@ app.get(
 
     const paginatedItems = filteredItems.slice(start, start + limit);
     
-    state.sortOrder = sortOrder;
-
     res.json({
       sortOrder: state.sortOrder,
       records: paginatedItems,
