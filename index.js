@@ -90,24 +90,21 @@ var app = (0, import_express.default)();
 app.use((0, import_cors.default)());
 app.use(import_express.default.json({ limit: "1000mb" }));
 app.use((0, import_multer.default)().any());
-var state = {
-  list: Array.from({ length: 1e6 }, (_, i) => ({
-    id: i + 1,
-    name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
-    order: i + 1
-  })),
-  sortOrder: "asc",
-  checkedIds: []
+var initializeState = () => {
+  return {
+    list: Array.from({ length: 1e6 }, (_, i) => ({
+      id: i + 1,
+      name: `\u042D\u043B\u0435\u043C\u0435\u043D\u0442 ${i + 1}`,
+      order: i + 1
+    })),
+    sortOrder: "asc",
+    checkedIds: []
+  };
 };
+var state = initializeState();
 var asyncHandler = (fn) => (req, res, next) => {
   return Promise.resolve(fn(req, res, next)).catch(next);
 };
-app.get(
-  "/",
-  asyncHandler((_, res) => {
-    res.json({ ok: 1 });
-  })
-);
 app.get(
   "/getList",
   asyncHandler((req, res) => {
